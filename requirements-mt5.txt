@@ -1,0 +1,2 @@
+# Install only on Windows where the MetaTrader 5 terminal is installed.
+MetaTrader5>=5.0.45
