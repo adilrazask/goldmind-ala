@@ -94,5 +94,19 @@ export const api = {
   getMarketDataHealth: () => fetchApi('/market-data/health'),
 
   // Page 10: Settings
-  getSettings: () => fetchApi('/settings')
+  getSettings: () => fetchApi('/settings'),
+
+  // Voice Command System
+  getVoiceStatus: () => fetchApi('/voice/status'),
+  transcribeVoice: (transcript: string, language: string = 'en-US') =>
+    fetchApi('/voice/transcribe', {
+      method: 'POST',
+      body: JSON.stringify({ transcript, language })
+    }),
+  sendVoiceCommand: (raw_text: string, passphrase?: string, session_id?: string) =>
+    fetchApi('/voice/command', {
+      method: 'POST',
+      body: JSON.stringify({ raw_text, passphrase, session_id })
+    })
 };
+

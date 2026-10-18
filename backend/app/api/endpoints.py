@@ -24,23 +24,14 @@ from backend.app.schemas.schemas import (
     OrderSubmitRequest, LiveTradingAuthRequest, KillSwitchRequest,
     LessonFeedback, InstructionCreate, DemonstrationCreate
 )
+from backend.app.core.dependencies import (
+    controller, scheduler, risk_engine, simulated_broker,
+    mt5_broker, active_broker, order_manager
+)
+from backend.app.voice.router import router as voice_router
 
 router = APIRouter()
-
-# Instantiate singletons
-controller = AgentController()
-scheduler = ResearchScheduler(controller)
-risk_engine = CentralRiskEngine(
-    daily_loss_limit_pct=settings.MAX_DAILY_LOSS_PCT,
-    max_risk_per_trade_pct=settings.MAX_RISK_PER_TRADE_PCT,
-    max_open_positions=settings.MAX_OPEN_POSITIONS,
-    max_spread_points=settings.MAX_SPREAD_POINTS,
-    daily_start_equity=settings.DAILY_START_EQUITY
-)
-simulated_broker = SimulatedBroker()
-mt5_broker = MT5BrokerAdapter()
-active_broker = simulated_broker # default reliable broker adapter
-order_manager = OrderLifecycleManager(active_broker, risk_engine)
+router.include_router(voice_router)
 
 # Active WebSocket connections
 class ConnectionManager:

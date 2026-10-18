@@ -1,14 +1,16 @@
 import React from 'react';
-import { Activity, ShieldAlert, Cpu, Play, Pause, Square, TrendingUp, TrendingDown, Zap, Globe, Sparkles } from 'lucide-react';
+import { Activity, ShieldAlert, Cpu, Play, Pause, Square, TrendingUp, TrendingDown, Zap, Globe, Sparkles, Mic } from 'lucide-react';
 
 interface NavbarProps {
   state: any;
   onControl: (action: string) => void;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
+  onOpenVoiceModal?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ state, onControl }) => {
+export const Navbar: React.FC<NavbarProps> = ({ state, onControl, onOpenVoiceModal }) => {
+
   const isKillSwitch = state?.kill_switch_active;
   const agentStatus = state?.agent_status || 'IDLE';
   const mode = state?.operating_mode || 'RESEARCH_ONLY';
@@ -173,7 +175,18 @@ export const Navbar: React.FC<NavbarProps> = ({ state, onControl }) => {
             </button>
           </div>
 
+          {/* Voice Command Assistant Button */}
+          <button
+            onClick={onOpenVoiceModal}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500/20 to-amber-600/10 hover:from-amber-500/30 hover:to-amber-600/20 text-amber-300 border border-amber-500/40 transition shadow-sm active:scale-95 group"
+            title="Open Voice Command Assistant (Push-to-Talk)"
+          >
+            <Mic className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition" />
+            <span className="font-mono">VOICE</span>
+          </button>
+
           {/* Emergency Kill Switch Button */}
+
           <button
             onClick={() => onControl(isKillSwitch ? 'DEACTIVATE_KILL_SWITCH' : 'KILL_SWITCH')}
             className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-lg active:scale-95 ${

@@ -11,8 +11,10 @@ import { DemoTradingPage } from './pages/DemoTradingPage';
 import { LiveControlsPage } from './pages/LiveControlsPage';
 import { MarketDataPage } from './pages/MarketDataPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { VoiceControlModal } from './components/VoiceControlModal';
 import { api } from './api';
 import { AlertTriangle, Wifi, WifiOff } from 'lucide-react';
+
 
 const INITIAL_FALLBACK_STATE = {
   agent_status: 'IDLE',
@@ -54,6 +56,7 @@ export function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(true);
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState<boolean>(false);
 
   const fetchGlobalData = async () => {
     try {
@@ -109,7 +112,15 @@ export function App() {
         onControl={handleControl}
         theme={theme}
         onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        onOpenVoiceModal={() => setIsVoiceModalOpen(true)}
       />
+
+      <VoiceControlModal
+        isOpen={isVoiceModalOpen}
+        onClose={() => setIsVoiceModalOpen(false)}
+        onCommandExecuted={fetchGlobalData}
+      />
+
 
       {/* Sleek Connectivity Status if Daemon is reconnecting */}
       {!isConnected && (
