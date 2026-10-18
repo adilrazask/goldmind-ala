@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: goldmind-ala
+    env: docker
+    plan: free
+    dockerfilePath: Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DELTA_ENVIRONMENT
+        value: INDIA_PRODUCTION
+      - key: DELTA_TRADING_MODE
+        value: PAPER
+      - key: DELTA_ENABLE_LIVE_TRADING
+        value: "NO"
+      - key: DELTA_API_KEY
+        sync: false
+      - key: DELTA_API_SECRET
+        sync: false
+      - key: ALA_VOICE_PASSPHRASE
+        value: "30th July"
+      - key: ALA_VOICE_PASSPHRASE_ENABLED
+        value: "true"
+      - key: ALA_MAX_RISK_PER_TRADE
+        value: "0.25"
+      - key: ALA_MAX_DAILY_LOSS
+        value: "1.0"
