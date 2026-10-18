@@ -68,6 +68,43 @@ class CommandInterpreter:
                 PermissionLevel.LEVEL_1_LOW_RISK
             ),
 
+            # Exchange & Account Operations (Level 1 & Level 2)
+            (
+                r"\b(open\s*positions?|my\s*positions?|current\s*positions?|positions?)\b",
+                VoiceCommandIntent.SHOW_OPEN_POSITIONS,
+                PermissionLevel.LEVEL_1_LOW_RISK
+            ),
+            (
+                r"\b(available\s*margin|margin|free\s*margin|account\s*balance|wallet\s*balance|balances?)\b",
+                VoiceCommandIntent.SHOW_AVAILABLE_MARGIN,
+                PermissionLevel.LEVEL_1_LOW_RISK
+            ),
+            (
+                r"\b(pending\s*orders?|open\s*orders?|active\s*orders?)\b",
+                VoiceCommandIntent.SHOW_PENDING_ORDERS,
+                PermissionLevel.LEVEL_1_LOW_RISK
+            ),
+            (
+                r"\b(start\s*paper\s*trading|paper\s*trading\s*mode|enable\s*paper\s*trading|switch\s*to\s*paper)\b",
+                VoiceCommandIntent.START_PAPER_TRADING,
+                PermissionLevel.LEVEL_1_LOW_RISK
+            ),
+            (
+                r"\b(realized\s*(and|&)\s*unrealized\s*p&?l|p&?l|profit\s*(and|&)\s*loss|today'?s\s*p&?l|how\s*much\s*profit)\b",
+                VoiceCommandIntent.SHOW_PROFIT_LOSS,
+                PermissionLevel.LEVEL_1_LOW_RISK
+            ),
+            (
+                r"\b(pause\s*(new\s*)?trading\s*signals?|pause\s*signals?)\b",
+                VoiceCommandIntent.PAUSE_TRADING_SIGNALS,
+                PermissionLevel.LEVEL_1_LOW_RISK
+            ),
+            (
+                r"\b(cancel\s*(this\s*)?(pending\s*)?order|delete\s*order)\b",
+                VoiceCommandIntent.CANCEL_PENDING_ORDER,
+                PermissionLevel.LEVEL_2_CONTROLLED_RESEARCH
+            ),
+
             # 3. Market Research Comparison & Reports
             (
                 r"\b(compare|comparison)\b",
@@ -164,6 +201,9 @@ class CommandInterpreter:
         # Check BTCUSD
         if re.search(r"\b(btcusd|bitcoin|btc)\b", text, re.IGNORECASE):
             symbols_found.append("BTCUSD")
+        # Check ETHUSD
+        if re.search(r"\b(ethusd|ethereum|eth)\b", text, re.IGNORECASE):
+            symbols_found.append("ETHUSD")
         # Check EURUSD
         if re.search(r"\b(eurusd|euro|eur)\b", text, re.IGNORECASE):
             symbols_found.append("EURUSD")

@@ -29,9 +29,11 @@ from backend.app.core.dependencies import (
     mt5_broker, active_broker, order_manager
 )
 from backend.app.voice.router import router as voice_router
+from backend.app.delta.router import router as delta_router
 
 router = APIRouter()
 router.include_router(voice_router)
+router.include_router(delta_router)
 
 # Active WebSocket connections
 class ConnectionManager:

@@ -33,6 +33,58 @@ INSTRUMENT_SPECS = {
         "volume_max": 10.0,
         "typical_spread_points": 35,
         "allowed_hours": (0, 24)
+    },
+    "BTC_USDT": {
+        "description": "Delta Exchange Bitcoin Perpetual (USDT)",
+        "digits": 2,
+        "point": 0.1,
+        "tick_size": 0.5,
+        "tick_value": 0.5,
+        "contract_size": 1.0,
+        "volume_min": 1.0,
+        "volume_step": 1.0,
+        "volume_max": 100.0,
+        "typical_spread_points": 20,
+        "allowed_hours": (0, 24)
+    },
+    "BTC_INR": {
+        "description": "Delta Exchange India Bitcoin Futures (INR)",
+        "digits": 2,
+        "point": 1.0,
+        "tick_size": 1.0,
+        "tick_value": 1.0,
+        "contract_size": 1.0,
+        "volume_min": 1.0,
+        "volume_step": 1.0,
+        "volume_max": 50.0,
+        "typical_spread_points": 25,
+        "allowed_hours": (0, 24)
+    },
+    "ETHUSD": {
+        "description": "Ethereum vs US Dollar",
+        "digits": 2,
+        "point": 0.01,
+        "tick_size": 0.05,
+        "tick_value": 0.05,
+        "contract_size": 1.0,
+        "volume_min": 0.1,
+        "volume_step": 0.1,
+        "volume_max": 50.0,
+        "typical_spread_points": 20,
+        "allowed_hours": (0, 24)
+    },
+    "ETH_USDT": {
+        "description": "Delta Exchange Ethereum Perpetual (USDT)",
+        "digits": 2,
+        "point": 0.01,
+        "tick_size": 0.05,
+        "tick_value": 0.05,
+        "contract_size": 1.0,
+        "volume_min": 1.0,
+        "volume_step": 1.0,
+        "volume_max": 100.0,
+        "typical_spread_points": 15,
+        "allowed_hours": (0, 24)
     }
 }
 

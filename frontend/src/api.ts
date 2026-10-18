@@ -107,6 +107,20 @@ export const api = {
     fetchApi('/voice/command', {
       method: 'POST',
       body: JSON.stringify({ raw_text, passphrase, session_id })
-    })
+    }),
+
+  // Delta Exchange Integration
+  getDeltaStatus: () => fetchApi('/delta/status'),
+  getDeltaProducts: () => fetchApi('/delta/products'),
+  getDeltaTickers: (symbol?: string) => fetchApi(`/delta/tickers${symbol ? `?symbol=${symbol}` : ''}`),
+  getDeltaCandles: (symbol: string = 'BTCUSD', resolution: string = '15m') => fetchApi(`/delta/candles?symbol=${symbol}&resolution=${resolution}`),
+  getDeltaAccount: () => fetchApi('/delta/account'),
+  getDeltaPositions: () => fetchApi('/delta/positions'),
+  getDeltaOrders: () => fetchApi('/delta/orders'),
+  setDeltaMode: (mode: string, phrase?: string) => fetchApi('/delta/mode', {
+    method: 'POST',
+    body: JSON.stringify({ mode, live_confirmation_phrase: phrase })
+  }),
+  reconcileDelta: () => fetchApi('/delta/reconcile', { method: 'POST' })
 };
 

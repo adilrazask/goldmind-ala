@@ -8,6 +8,8 @@ from backend.app.brokers.mt5_adapter import MT5BrokerAdapter
 from backend.app.risk.engine import CentralRiskEngine
 from backend.app.execution.order_manager import OrderLifecycleManager
 
+from backend.app.delta.adapter import delta_broker
+
 # System Singletons
 controller = AgentController()
 scheduler = ResearchScheduler(controller)
@@ -22,3 +24,17 @@ simulated_broker = SimulatedBroker()
 mt5_broker = MT5BrokerAdapter()
 active_broker = simulated_broker
 order_manager = OrderLifecycleManager(active_broker, risk_engine)
+
+def set_active_broker(broker_name: str):
+    """Dynamically switches active broker adapter (simulated, mt5, delta)."""
+    global active_broker, order_manager
+    name = broker_name.lower().strip()
+    if name == "delta":
+        active_broker = delta_broker
+    elif name == "mt5":
+        active_broker = mt5_broker
+    else:
+        active_broker = simulated_broker
+    order_manager.broker = active_broker
+    return active_broker
+

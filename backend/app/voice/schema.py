@@ -39,6 +39,15 @@ class VoiceCommandIntent(str, Enum):
     READ_LATEST_REPORT = "read_latest_report"
     SHOW_ACTIVITY_LOG = "show_activity_log"
 
+    # Exchange & Account Operations (Level 1: Read-only Queries & Paper Mode)
+    SHOW_OPEN_POSITIONS = "show_open_positions"
+    SHOW_AVAILABLE_MARGIN = "show_available_margin"
+    SHOW_PENDING_ORDERS = "show_pending_orders"
+    START_PAPER_TRADING = "start_paper_trading"
+    SHOW_PROFIT_LOSS = "show_profit_loss"
+    CANCEL_PENDING_ORDER = "cancel_pending_order"
+    PAUSE_TRADING_SIGNALS = "pause_trading_signals"
+
     # Conversational Follow-up (Contextual)
     CONVERSATIONAL_FOLLOWUP = "conversational_followup"
 

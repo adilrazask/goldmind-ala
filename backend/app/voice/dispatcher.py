@@ -12,6 +12,9 @@ from backend.app.market_data.manager import MarketDataManager
 from backend.app.backtesting.engine import BacktestEngine
 from backend.app.voice.schema import VoiceCommand, VoiceResponse, VoiceCommandIntent, PermissionLevel
 from backend.app.core.dependencies import controller, scheduler, risk_engine, active_broker
+from backend.app.delta.adapter import delta_broker
+from backend.app.delta.rest_client import delta_client
+from backend.app.delta.config import delta_settings
 
 def calc_ema(values: List[float], period: int) -> float:
     if not values:
@@ -130,6 +133,22 @@ class VoiceCommandDispatcher:
                 return self._handle_read_report(cmd_id, cmd, now_iso)
             elif cmd.intent == VoiceCommandIntent.SHOW_ACTIVITY_LOG:
                 return self._handle_activity_log(cmd_id, cmd, now_iso)
+
+            # Exchange Operations
+            elif cmd.intent == VoiceCommandIntent.SHOW_OPEN_POSITIONS:
+                return self._handle_show_open_positions(cmd_id, cmd, now_iso)
+            elif cmd.intent == VoiceCommandIntent.SHOW_AVAILABLE_MARGIN:
+                return self._handle_show_available_margin(cmd_id, cmd, now_iso)
+            elif cmd.intent == VoiceCommandIntent.SHOW_PENDING_ORDERS:
+                return self._handle_show_pending_orders(cmd_id, cmd, now_iso)
+            elif cmd.intent == VoiceCommandIntent.START_PAPER_TRADING:
+                return self._handle_start_paper_trading(cmd_id, cmd, now_iso)
+            elif cmd.intent == VoiceCommandIntent.SHOW_PROFIT_LOSS:
+                return self._handle_show_profit_loss(cmd_id, cmd, now_iso)
+            elif cmd.intent == VoiceCommandIntent.PAUSE_TRADING_SIGNALS:
+                return self._handle_pause_trading_signals(cmd_id, cmd, now_iso)
+            elif cmd.intent == VoiceCommandIntent.CANCEL_PENDING_ORDER:
+                return self._handle_cancel_pending_order(cmd_id, cmd, now_iso)
 
             else:
                 return VoiceResponse(
@@ -753,6 +772,170 @@ class VoiceCommandDispatcher:
             )
         finally:
             db.close()
+
+    def _handle_show_open_positions(self, cmd_id: str, cmd: VoiceCommand, now_iso: str) -> VoiceResponse:
+        positions = delta_broker.get_positions()
+        if not positions:
+            display = "### 📈 Delta Exchange Open Positions\n\nNo active open positions currently held."
+            spoken = "You have no active open positions on Delta Exchange."
+        else:
+            lines = []
+            for p in positions:
+                lines.append(f"- **{p['symbol']}** ({p['side']}): Volume `{p['volume']}`, Entry `${p['open_price']:,.2f}`, Unrealized PnL: `${p['unrealized_profit']:+,.2f}`")
+            display = f"### 📈 Delta Exchange Open Positions ({len(positions)})\n\n" + "\n".join(lines)
+            spoken = f"You have {len(positions)} open position{'s' if len(positions) > 1 else ''} on Delta Exchange."
+
+        return VoiceResponse(
+            command_id=cmd_id,
+            intent=cmd.intent.value,
+            permission_level=cmd.permission_level.value,
+            status="SUCCESS",
+            display_text=display,
+            spoken_summary=spoken,
+            data={"positions": positions},
+            timestamp=now_iso
+        )
+
+    def _handle_show_available_margin(self, cmd_id: str, cmd: VoiceCommand, now_iso: str) -> VoiceResponse:
+        acct = delta_broker.get_account_info()
+        bal = acct.get("balance", 0.0)
+        margin = acct.get("free_margin", 0.0)
+        curr = acct.get("currency", "USD")
+        mode = acct.get("mode", "PAPER")
+
+        display = (
+            f"### 💼 Delta Exchange Account Balance & Margin\n\n"
+            f"- **Operating Mode**: `{mode}`\n"
+            f"- **Account Currency**: `{curr}`\n"
+            f"- **Total Balance**: `${bal:,.2f}`\n"
+            f"- **Free Margin**: `${margin:,.2f}`\n"
+            f"- **Used Margin**: `${acct.get('margin', 0.0):,.2f}`\n"
+            f"- **Connected**: `{'Yes' if acct.get('is_connected') else 'No'}`"
+        )
+        spoken = f"Your Delta Exchange {mode.lower()} account balance is {bal:,.2f} {curr}, with {margin:,.2f} {curr} available margin."
+
+        return VoiceResponse(
+            command_id=cmd_id,
+            intent=cmd.intent.value,
+            permission_level=cmd.permission_level.value,
+            status="SUCCESS",
+            display_text=display,
+            spoken_summary=spoken,
+            data=acct,
+            timestamp=now_iso
+        )
+
+    def _handle_show_pending_orders(self, cmd_id: str, cmd: VoiceCommand, now_iso: str) -> VoiceResponse:
+        orders = delta_client.get_open_orders()
+        if not orders:
+            display = "### 📋 Delta Exchange Pending Orders\n\nNo active pending orders found."
+            spoken = "You have no active pending orders on Delta Exchange."
+        else:
+            lines = [f"- Order #{o.get('id')}: {o.get('side', '').upper()} {o.get('size')} contracts at ${o.get('limit_price', 'Market')}" for o in orders]
+            display = f"### 📋 Delta Exchange Pending Orders ({len(orders)})\n\n" + "\n".join(lines)
+            spoken = f"You have {len(orders)} active pending order{'s' if len(orders) > 1 else ''} on Delta Exchange."
+
+        return VoiceResponse(
+            command_id=cmd_id,
+            intent=cmd.intent.value,
+            permission_level=cmd.permission_level.value,
+            status="SUCCESS",
+            display_text=display,
+            spoken_summary=spoken,
+            data={"orders": orders},
+            timestamp=now_iso
+        )
+
+    def _handle_start_paper_trading(self, cmd_id: str, cmd: VoiceCommand, now_iso: str) -> VoiceResponse:
+        delta_settings.trading_mode = "PAPER"
+        delta_settings.is_live_enabled = False
+        display = (
+            f"### 🧪 Paper Trading Mode Active\n\n"
+            f"- **Exchange**: `Delta Exchange ({delta_settings.environment.value})`\n"
+            f"- **Execution Mode**: `PAPER (Mode A)`\n"
+            f"- **Safety**: Zero real capital risk. Orders are filled against real Delta market prices."
+        )
+        spoken = "Paper trading mode is now active. All strategy trades will be simulated against real Delta Exchange prices without real capital risk."
+
+        return VoiceResponse(
+            command_id=cmd_id,
+            intent=cmd.intent.value,
+            permission_level=cmd.permission_level.value,
+            status="SUCCESS",
+            display_text=display,
+            spoken_summary=spoken,
+            data={"mode": "PAPER"},
+            timestamp=now_iso
+        )
+
+    def _handle_show_profit_loss(self, cmd_id: str, cmd: VoiceCommand, now_iso: str) -> VoiceResponse:
+        positions = delta_broker.get_positions()
+        unrealized = sum(float(p.get("unrealized_profit") or 0.0) for p in positions)
+        realized = sum(float(p.get("realized_profit") or 0.0) for p in positions)
+        total_pnl = unrealized + realized
+
+        display = (
+            f"### 📊 Delta Exchange P&L Summary\n\n"
+            f"- **Unrealized P&L**: `${unrealized:+,.2f}`\n"
+            f"- **Realized P&L**: `${realized:+,.2f}`\n"
+            f"- **Net Combined P&L**: `${total_pnl:+,.2f}`"
+        )
+        spoken = f"Today's net P and L is {total_pnl:+,.2f} dollars, with {unrealized:+,.2f} unrealized and {realized:+,.2f} realized."
+
+        return VoiceResponse(
+            command_id=cmd_id,
+            intent=cmd.intent.value,
+            permission_level=cmd.permission_level.value,
+            status="SUCCESS",
+            display_text=display,
+            spoken_summary=spoken,
+            data={"unrealized": unrealized, "realized": realized, "total_pnl": total_pnl},
+            timestamp=now_iso
+        )
+
+    def _handle_pause_trading_signals(self, cmd_id: str, cmd: VoiceCommand, now_iso: str) -> VoiceResponse:
+        controller.is_research_paused = True
+        display = "### ⏸️ Trading Signals Paused\n\nNew automated strategy signal generation and trade evaluations are now paused."
+        spoken = "Trading signals and research cycles have been paused."
+        return VoiceResponse(
+            command_id=cmd_id,
+            intent=cmd.intent.value,
+            permission_level=cmd.permission_level.value,
+            status="SUCCESS",
+            display_text=display,
+            spoken_summary=spoken,
+            data={"signals_paused": True},
+            timestamp=now_iso
+        )
+
+    def _handle_cancel_pending_order(self, cmd_id: str, cmd: VoiceCommand, now_iso: str) -> VoiceResponse:
+        orders = delta_client.get_open_orders()
+        if not orders:
+            return VoiceResponse(
+                command_id=cmd_id,
+                intent=cmd.intent.value,
+                permission_level=cmd.permission_level.value,
+                status="SUCCESS",
+                display_text="### ℹ️ No Orders to Cancel\n\nThere are no active pending orders on Delta Exchange.",
+                spoken_summary="There are no pending orders to cancel.",
+                data={"cancelled_count": 0},
+                timestamp=now_iso
+            )
+        first_order = orders[0]
+        oid = first_order.get("id")
+        res = delta_client.cancel_order(order_id=oid)
+        display = f"### 🗑️ Order Cancelled\n\nOrder `#{oid}` cancellation requested on Delta Exchange."
+        spoken = f"Pending order {oid} has been cancelled on Delta Exchange."
+        return VoiceResponse(
+            command_id=cmd_id,
+            intent=cmd.intent.value,
+            permission_level=cmd.permission_level.value,
+            status="SUCCESS",
+            display_text=display,
+            spoken_summary=spoken,
+            data={"cancelled_order_id": oid, "result": res},
+            timestamp=now_iso
+        )
 
     def _log_audit(self, action: str, actor: str, details: Dict[str, Any]):
         db = SessionLocal()
