@@ -12,8 +12,7 @@ FROM python:3.11-slim
 WORKDIR /app
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PORT=8000
+    PYTHONDONTWRITEBYTECODE=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -32,12 +31,13 @@ COPY backend/ ./backend/
 COPY ala/ ./ala/
 COPY data/ ./data/
 COPY main.py .
+COPY start.py .
 
 # Copy built frontend assets from builder
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
-# Expose default port
+# Informational expose
 EXPOSE 8000
 
-# Start unified FastAPI server with proper shell variable expansion
-CMD ["sh", "-c", "uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Start via production python entrypoint (handles dynamic $PORT without shell escaping bugs)
+CMD ["python", "start.py"]
