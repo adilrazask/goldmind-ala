@@ -76,22 +76,48 @@ class AgentController:
         if self.is_research_paused:
             return {"status": "PAUSED", "message": "Research task execution is currently paused by operator."}
 
-        target_obj_id = objective_id or self.active_objective_id
-        if not target_obj_id:
-            return None
-
         db = SessionLocal()
         try:
-            task = db.query(AgentTask).filter_by(
-                objective_id=target_obj_id, status="PENDING"
-            ).order_by(AgentTask.created_at.asc()).first()
+            target_obj_id = objective_id or self.active_objective_id
+            task = None
+            if target_obj_id:
+                task = db.query(AgentTask).filter_by(
+                    objective_id=target_obj_id, status="PENDING"
+                ).order_by(AgentTask.created_at.asc()).first()
             
+            if not task and objective_id is None:
+                # Autonomous mode: find any pending task in an active objective
+                pending_task = db.query(AgentTask).join(AgentObjective, AgentTask.objective_id == AgentObjective.id).filter(
+                    AgentObjective.status == "ACTIVE",
+                    AgentTask.status == "PENDING"
+                ).order_by(AgentTask.created_at.asc()).first()
+
+                if pending_task:
+                    task = pending_task
+                    self.active_objective_id = task.objective_id
+                else:
+                    # Auto-formulate next exploration objective
+                    import random
+                    families = ["momentum", "breakout", "mean_reversion", "volatility", "trend_following"]
+                    instruments = ["BTCUSD", "XAUUSD", "ETHUSD"]
+                    chosen_fam = random.choice(families)
+                    chosen_inst = random.choice(instruments)
+                    db.close()
+                    new_obj = self.create_objective(
+                        raw_prompt=f"Autonomous research investigating {chosen_fam} candidate on {chosen_inst} (M15)",
+                        title=f"Autonomous Alpha Loop: {chosen_inst} {chosen_fam.title()}"
+                    )
+                    db = SessionLocal()
+                    task = db.query(AgentTask).filter_by(
+                        objective_id=new_obj["objective_id"], status="PENDING"
+                    ).order_by(AgentTask.created_at.asc()).first()
+
             if not task:
-                # Mark objective completed if all tasks are done
-                obj = db.query(AgentObjective).filter_by(id=target_obj_id).first()
-                if obj and obj.status == "ACTIVE":
-                    obj.status = "COMPLETED"
-                    db.commit()
+                if target_obj_id:
+                    obj = db.query(AgentObjective).filter_by(id=target_obj_id).first()
+                    if obj and obj.status == "ACTIVE":
+                        obj.status = "COMPLETED"
+                        db.commit()
                 return None
 
             task.status = "RUNNING"
