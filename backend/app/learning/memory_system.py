@@ -12,6 +12,8 @@ from backend.app.models.entities import (
 
 class AutonomousMemorySystem:
     def __init__(self):
+        from backend.app.database.session import init_db
+        init_db()
         self._ensure_default_instructions()
         self._ensure_default_procedure()
 

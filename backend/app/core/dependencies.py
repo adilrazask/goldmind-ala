@@ -9,6 +9,10 @@ from backend.app.risk.engine import CentralRiskEngine
 from backend.app.execution.order_manager import OrderLifecycleManager
 
 from backend.app.delta.adapter import delta_broker
+from backend.app.database.session import init_db
+
+# Ensure database tables exist before controllers query them
+init_db()
 
 # System Singletons
 controller = AgentController()

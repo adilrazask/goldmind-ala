@@ -8,6 +8,9 @@ root_dir = Path(__file__).resolve().parent
 (root_dir / "backend" / "data").mkdir(parents=True, exist_ok=True)
 (root_dir / "data").mkdir(parents=True, exist_ok=True)
 
+from backend.app.database.session import init_db
+init_db()
+
 import uvicorn
 
 if __name__ == "__main__":
