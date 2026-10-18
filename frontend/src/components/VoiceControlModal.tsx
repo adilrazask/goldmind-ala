@@ -193,7 +193,10 @@ export const VoiceControlModal: React.FC<VoiceControlModalProps> = ({
       } else if (execData.requires_passphrase) {
         setPassphraseRequired(true);
         setStatus('IDLE');
+        handleSpeak(execData.spoken_summary || 'This action is protected. Please speak your voice passphrase.');
       } else {
+        setPassphraseRequired(false);
+        setPassphraseInput('');
         setStatus('SUCCESS');
         handleSpeak(execData.spoken_summary);
         if (onCommandExecuted) {

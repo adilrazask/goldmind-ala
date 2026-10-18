@@ -1,30 +1,38 @@
-"""Voice Command API Endpoints."""
+"""FastAPI Router for GoldMind ALA Voice Control Interface."""
 from __future__ import annotations
-from typing import Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import Optional, Dict, Any, List
+
+from backend.app.voice.schema import (
+    VoiceCommand, VoiceResponse, VoiceCommandIntent, PermissionLevel
+)
+from backend.app.voice.config import voice_settings, VERIFIER_FILE
 from backend.app.voice.recognizer import speech_recognizer
 from backend.app.voice.interpreter import command_interpreter
 from backend.app.voice.dispatcher import voice_dispatcher
 from backend.app.voice.session_context import session_manager
 from backend.app.voice.security import voice_security
 from backend.app.voice.wake_word import wake_word_service
-from backend.app.voice.config import voice_settings
-from backend.app.voice.schema import (
-    VoiceCommand, VoiceResponse, PassphraseVerificationRequest,
-    PassphraseConfigUpdate, PermissionLevel
-)
 
-router = APIRouter(prefix="/voice", tags=["Voice Command System"])
-
-class TranscribeRequest(BaseModel):
-    transcript: str
-    language: Optional[str] = "en-US"
+router = APIRouter(prefix="/voice", tags=["Voice System"])
 
 class CommandExecutionRequest(BaseModel):
     raw_text: str
-    passphrase: Optional[str] = None
     session_id: Optional[str] = "default_session"
+    passphrase: Optional[str] = None
+
+class TranscribeRequest(BaseModel):
+    transcript: str
+
+class PassphraseVerificationRequest(BaseModel):
+    passphrase: str
+    session_id: Optional[str] = "default_session"
+
+class PassphraseConfigUpdate(BaseModel):
+    current_passphrase: Optional[str] = None
+    new_passphrase: str
+    enabled: bool = True
 
 class WakeWordToggleRequest(BaseModel):
     enable: bool
@@ -34,13 +42,21 @@ class WakeWordDetectRequest(BaseModel):
 
 @router.get("/status")
 def get_voice_status():
-    """Returns speech recognition service status, supported languages, and privacy disclosures."""
+    """Returns speech recognition service status, supported languages, and security disclosures."""
     speech_stat = speech_recognizer.get_service_status()
     wake_stat = wake_word_service.get_status()
     return {
         "speech": speech_stat,
         "wake_word": wake_stat,
         "passphrase_enabled": voice_settings.passphrase_enabled,
+        "passphrase_info": {
+            "enabled": voice_settings.passphrase_enabled,
+            "verifier_storage": str(VERIFIER_FILE.relative_to(VERIFIER_FILE.parent.parent.parent)),
+            "hashing_algorithm": "PBKDF2 HMAC-SHA256 (100,000 iterations, 16-byte random salt)",
+            "initial_default": "30th July (Initial configuration; not biometric speaker identity)",
+            "accepted_variations": ["30th July", "thirtieth July", "thirtieth of July", "July 30th", "30 July", "thirty july"],
+            "security_policy": "Level 3 actions (live trading, risk limits) strictly blocked via voice regardless of passphrase."
+        },
         "supported_symbols": voice_settings.supported_symbols,
         "supported_timeframes": list(set(voice_settings.supported_timeframes.values()))
     }
@@ -74,32 +90,34 @@ def execute_voice_command(payload: CommandExecutionRequest):
 
     # 3. Check for Passphrase if required for Level 2 Controlled Research
     if cmd.permission_level == PermissionLevel.LEVEL_2_CONTROLLED_RESEARCH and voice_settings.passphrase_enabled:
-        if not payload.passphrase:
-            return VoiceResponse(
-                command_id=f"vcmd_{sid[:6]}",
-                intent=cmd.intent.value,
-                permission_level=cmd.permission_level.value,
-                status="CONFIRMATION_REQUIRED",
-                display_text=(
-                    f"### 🔐 Passphrase Required\n\n"
-                    f"Action **{cmd.intent.value}** is classified as Controlled Research. "
-                    f"Please provide your voice passphrase to execute."
-                ),
-                spoken_summary="This research action requires voice passphrase verification.",
-                data={"requires_passphrase": True},
-                requires_passphrase=True,
-                timestamp=""
-            )
+        is_authenticated = voice_security.is_session_authenticated(sid)
+        if not is_authenticated:
+            if not payload.passphrase:
+                return VoiceResponse(
+                    command_id=f"vcmd_{sid[:6]}",
+                    intent=cmd.intent.value,
+                    permission_level=cmd.permission_level.value,
+                    status="CONFIRMATION_REQUIRED",
+                    display_text=(
+                        f"### 🔐 Voice Passphrase Required\n\n"
+                        f"Action **{cmd.intent.value}** is classified as Controlled Research.\n\n"
+                        f"Please speak the configured voice passphrase to execute."
+                    ),
+                    spoken_summary="This action is protected. Please speak your voice passphrase.",
+                    data={"requires_passphrase": True, "action": cmd.intent.value},
+                    requires_passphrase=True,
+                    timestamp=""
+                )
 
-        # Verify passphrase
-        valid, msg = voice_security.verify_attempt(sid, payload.passphrase)
-        if not valid:
-            raise HTTPException(status_code=401, detail=msg)
+            # Verify provided passphrase
+            valid, msg = voice_security.verify_attempt(sid, payload.passphrase)
+            if not valid:
+                raise HTTPException(status_code=401, detail=msg)
 
     # 4. Dispatch to actual GoldMind ALA functions
     response: VoiceResponse = voice_dispatcher.dispatch(cmd)
 
-    # 5. Record conversational turn
+    # 5. Record conversational turn (scrubbing any sensitive tokens)
     session.add_turn(
         user_text=raw_text,
         intent=cmd.intent.value,
@@ -112,16 +130,16 @@ def execute_voice_command(payload: CommandExecutionRequest):
 
 @router.post("/passphrase/verify")
 def verify_voice_passphrase(payload: PassphraseVerificationRequest):
-    """Verifies passphrase with rate limiting and temporary lockout."""
+    """Verifies passphrase with speech-variation tolerance, rate limiting, and temporary lockout."""
     sid = payload.session_id or "default_session"
     valid, msg = voice_security.verify_attempt(sid, payload.passphrase)
     if not valid:
         raise HTTPException(status_code=401, detail=msg)
-    return {"status": "VERIFIED", "message": msg}
+    return {"status": "VERIFIED", "message": msg, "session_authenticated": True}
 
 @router.post("/passphrase/update")
 def update_voice_passphrase(payload: PassphraseConfigUpdate):
-    """Updates passphrase or security settings."""
+    """Updates passphrase or security settings. Verifier is persisted in backend/data/voice_verifier.json."""
     if voice_settings.passphrase_enabled and payload.current_passphrase:
         valid, msg = voice_security.verify_attempt("admin", payload.current_passphrase)
         if not valid:
@@ -129,7 +147,11 @@ def update_voice_passphrase(payload: PassphraseConfigUpdate):
 
     voice_settings.update_passphrase(payload.new_passphrase)
     voice_settings.passphrase_enabled = payload.enabled
-    return {"status": "SUCCESS", "message": "Voice passphrase updated successfully."}
+    return {
+        "status": "SUCCESS",
+        "message": "Voice passphrase updated successfully and saved to verifier storage.",
+        "storage": "backend/data/voice_verifier.json"
+    }
 
 @router.get("/wake-word/status")
 def get_wake_word_status():

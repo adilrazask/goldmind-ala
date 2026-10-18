@@ -101,16 +101,65 @@ def test_08_followup_question_using_conversation_context():
     # Should automatically inherit XAUUSD from session context
     assert "XAUUSD" in r2.json()["display_text"]
 
-# 9. Incorrect passphrase
-def test_09_incorrect_passphrase():
-    sid = "test_pass_session_1"
+# 9. Passphrase verification: variations of '30th July' and rejection of unrelated phrases
+def test_09_passphrase_variations_and_rejections():
+    sid = "test_pass_session_variations"
     voice_security.reset_lockout(sid)
-    res = client.post("/api/v1/voice/passphrase/verify", json={
-        "passphrase": "totally_wrong_passphrase",
-        "session_id": sid
+    
+    # 9a. Test that speech recognition variations of "30th July" are all accepted
+    valid_variations = [
+        "30th July",
+        "thirtieth July",
+        "thirtieth of July",
+        "July 30th",
+        "July 30",
+        "July thirtieth",
+        "30 July",
+        "thirty july"
+    ]
+    for variation in valid_variations:
+        res = client.post("/api/v1/voice/passphrase/verify", json={
+            "passphrase": variation,
+            "session_id": sid
+        })
+        assert res.status_code == 200, f"Failed to verify variation: {variation}"
+        assert res.json()["status"] == "VERIFIED"
+
+    # 9b. Test that unrelated phrases are strictly rejected
+    invalid_phrases = [
+        "totally_wrong_passphrase",
+        "31st July",
+        "30th August",
+        "July 1st",
+        "30th June"
+    ]
+    for invalid in invalid_phrases:
+        sid_inv = f"test_inv_{invalid}"
+        voice_security.reset_lockout(sid_inv)
+        res = client.post("/api/v1/voice/passphrase/verify", json={
+            "passphrase": invalid,
+            "session_id": sid_inv
+        })
+        assert res.status_code == 401
+        assert "Invalid passphrase" in res.json()["detail"]
+
+    # 9c. Protected command without passphrase prompts user to speak passphrase
+    cmd_res = client.post("/api/v1/voice/command", json={
+        "raw_text": "Run backtest on BTCUSD",
+        "session_id": "unauth_session"
     })
-    assert res.status_code == 401
-    assert "Invalid passphrase" in res.json()["detail"]
+    assert cmd_res.status_code == 200
+    assert cmd_res.json()["status"] == "CONFIRMATION_REQUIRED"
+    assert "Please speak your voice passphrase" in cmd_res.json()["spoken_summary"]
+
+    # 9d. Protected command with spoken variation 'thirtieth July' executes successfully
+    auth_cmd_res = client.post("/api/v1/voice/command", json={
+        "raw_text": "Run backtest on BTCUSD",
+        "session_id": "auth_test_session",
+        "passphrase": "thirtieth July"
+    })
+    assert auth_cmd_res.status_code == 200
+    assert auth_cmd_res.json()["status"] == "SUCCESS"
 
 # 10. Repeated authentication failures and lockout
 def test_10_repeated_authentication_failures_lockout():
@@ -127,7 +176,7 @@ def test_10_repeated_authentication_failures_lockout():
 
     # 4th attempt should be rejected with lockout message
     locked_res = client.post("/api/v1/voice/passphrase/verify", json={
-        "passphrase": "GoldMind secure command",
+        "passphrase": "30th July",
         "session_id": sid
     })
     assert locked_res.status_code == 401
