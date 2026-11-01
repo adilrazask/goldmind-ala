@@ -1,43 +1,37 @@
-# Multi-stage production build for GoldMind ALA
-# Stage 1: Build React Frontend
-FROM node:20-alpine AS frontend-builder
-WORKDIR /app/frontend
-COPY frontend/package*.json ./
-RUN npm install
-COPY frontend/ ./
-RUN npm run build
-
-# Stage 2: Python Production Runtime
+# GoldMind ALA Production Dockerfile
+# Single-stage build — frontend/dist/ is pre-built and committed to git
 FROM python:3.11-slim
+
 WORKDIR /app
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
+# Install minimal system deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Create required data directories
+# Create required data directories (SQLite will live here)
 RUN mkdir -p /app/backend/data /app/data
 
-# Copy application source
+# Copy application code
 COPY backend/ ./backend/
 COPY ala/ ./ala/
 COPY data/ ./data/
 COPY main.py .
 COPY start.py .
 
-# Copy built frontend assets from builder
-COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+# Copy pre-built frontend assets (already in git)
+COPY frontend/dist/ ./frontend/dist/
 
-# Informational expose
+# Railway uses $PORT env var (default 8000)
 EXPOSE 8000
 
-# Start via production python entrypoint (handles dynamic $PORT without shell escaping bugs)
+# Start via Python entrypoint (reads $PORT dynamically)
 CMD ["python", "start.py"]
